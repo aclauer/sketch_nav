@@ -41,12 +41,11 @@ def handle_events(drawing_surface):
 
 def points_to_moves(points):
     # Ratio between pixel values and real world positions
-
     x_px_to_m = WIDTH_M / WIDTH_PX
     y_px_to_m = HEIGHT_M / HEIGHT_PX
 
-    i = 0
-    heading = 0
+    headings = []
+
     for i in range(len(points)-1):
         cp = points[i]
         np = points[i+1]
@@ -54,23 +53,27 @@ def points_to_moves(points):
         dx = np[0] - cp[0]
         dy = np[1] - cp[1]
 
-        
+        headings.append(math.degrees(math.atan2(dx, dy)))
 
-        theta = -(math.degrees(math.atan2(dy, dx)) - heading)
-        print("heading = " + str(heading))
-        # print("raw theta = " + str(-math.degrees(math.atan2(dy, dx))))
-        # print("computed turn = " + str(theta))
-        heading += theta
-        # if len(moves) is not 0:
-        #     theta = theta - moves[i-2][2]
+        if i != 0:
+            rel_heading = headings[i]-headings[i-1]
+            if rel_heading > 180:
+                rel_heading -= 360
+            if rel_heading < -180:
+                rel_heading += 360
+                # rel_heading = rel_heading % 360
+            print("relative heading between point " + str(i-1) + " and " + str(i) + ": " + str(rel_heading))
 
-        moves.append((0, 0, theta))
-        # print("adding a turn: " + str(-theta))
+            
 
-        mx = math.sqrt((dy * y_px_to_m)**2 + (dx * x_px_to_m)**2)
+            mx = math.sqrt((dy * y_px_to_m)**2 + (dx * x_px_to_m)**2)
+            moves.append((mx, 0, 0))
+            moves.append((0, 0, rel_heading))
+        else:
+            moves.append((0, 0, 90-math.degrees(math.atan2(dx, dy))))
 
-        moves.append((mx, 0, 0))
-        # print("adding a move: " + str(mx))
+    # for move in moves:
+    #     print(move)
 
 
 def main():
@@ -89,6 +92,7 @@ def main():
 
     points_to_moves(waypoints)
 
+    # Call relative move function here to move the robot
     for move in moves:
         print(move)
 
