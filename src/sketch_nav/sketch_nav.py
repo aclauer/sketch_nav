@@ -16,7 +16,7 @@ from bosdyn.client.robot_command import (RobotCommandBuilder, RobotCommandClient
                                          block_for_trajectory_cmd, blocking_stand)
 from bosdyn.client.robot_state import RobotStateClient
 
-_LOGGER = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 WIDTH_PX, HEIGHT_PX = 700, 800 # Width and height of the pygame
@@ -53,6 +53,7 @@ def handle_events(drawing_surface):
             pygame.quit()
         elif event.type == pygame.MOUSEBUTTONUP:
             # Add a new waypoint when the user clicks a point on the maze
+            print('Adding a new waypoint: ' + str(event.pos))
             waypoints.append(event.pos)
             pygame.draw.circle(drawing_surface, RED, event.pos, 7)
             pygame.draw.line(drawing_surface, RED, waypoints[-1], waypoints[-2], 5)
@@ -135,7 +136,6 @@ def main():
     parser.add_argument('--frame', choices=[VISION_FRAME_NAME, ODOM_FRAME_NAME],
                         default=ODOM_FRAME_NAME, help='Send the command in this frame.')
     options = parser.parse_args()
-    print(options)
 
     bosdyn.client.util.setup_logging(options.verbose)
 
@@ -143,23 +143,6 @@ def main():
     sdk = bosdyn.client.create_standard_sdk('RobotCommandMaster')
     robot = sdk.create_robot(options.hostname)
     bosdyn.client.util.authenticate(robot)
-
-    # Initialize interface
-    screen, background_image, drawing_surface = init_interface()
-
-    running = True
-    while running:
-        screen.blit(background_image, (0, 0))
-        screen.blit(drawing_surface, (0, 0))
-        handle_events(drawing_surface)
-
-        try:
-            pygame.display.flip()
-        except:
-            running = False
-
-    points_to_moves(waypoints)
-    print(moves)
 
     ##### Start moving the robot #####
 
@@ -174,19 +157,39 @@ def main():
     robot_state_client = robot.ensure_client(RobotStateClient.default_service_name)
     robot_command_client = robot.ensure_client(RobotCommandClient.default_service_name)
 
-    print(options)
-
     with LeaseKeepAlive(lease_client, must_acquire=True, return_at_exit=True):
         # Power on the robot and stand it up.
         robot.time_sync.wait_for_sync()
+        print('Powering on the robot')
         robot.power_on()
-        blocking_stand(robot_command_client)
 
-        # Call relative move function here to move the robot
-        print(moves)
+        print('The robot is standing')
+        blocking_stand(robot_command_client)
+        
+        # Initialize interface
+        screen, background_image, drawing_surface = init_interface()
+
+        running = True
+        while running:
+            screen.blit(background_image, (0, 0))
+            screen.blit(drawing_surface, (0, 0))
+            handle_events(drawing_surface)
+
+            # This is a hacky way to stop the interface
+            try:
+                pygame.display.flip()
+            except:
+                running = False
+
+        points_to_moves(waypoints)        
+
+        # Call relative move function here to move the robots
         for move in moves:
+            print('Moving: (dx=' + str(move[0]) + ', dy=' + str(move[1]) + ', dyaw=' + str(move[2]))
             relative_move(move[0], move[1], math.radians(move[2]), options.frame, robot_command_client, robot_state_client, stairs=False)
             
+
+        print('Completed the movement!')
 
 if __name__ == "__main__":
     main()
